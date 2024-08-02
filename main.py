@@ -49,10 +49,11 @@ def main():
         password = server["password"]
         output_filename = f"{today}_{hostname}.txt"
         print(f"Checking server {hostname}...")
-        with open(output_filename, 'w') as f:
-            f.write(f"===== {hostname} =====\n")
-            for command in commands:
-                result = ssh_command(hostname, username, password, command)
+        for command in commands:
+            print(f"Executing command: {command}")
+            result = ssh_command(hostname, username, password, command)
+            with open(output_filename, 'w') as f:
+                f.write(f"===== {hostname} =====\n")
                 if result:
                     f.write(f"=== Command: {command} ===\n")
                     f.write(result)

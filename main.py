@@ -1,78 +1,67 @@
 import paramiko
-import datetime
+from datetime import date
 
-# 服务器信息
+# 服务器地址和账户名密码列表
 servers = [
-    {
-        'name': 'Server1',
-        'host': 'server1.example.com',
-        'username': 'your_username',
-        'password': 'your_password',
-        'port': 22
-    },
-    {
-        'name': 'Server2',
-        'host': 'server2.example.com',
-        'username': 'your_username',
-        'password': 'your_password',
-        'port': 22
-    }
+    {"hostname": "", "username": "", "password": ""},
 ]
 
-# 定义要执行的命令和对应的标题
+# 定义要执行的多个命令
 commands = [
-    ("find / -type f -size 0 -exec rm {} \;", "Deleting 0-byte files"),
-    ("ps aux --sort=-%mem", "Top processes by memory usage"),
-    ("mount | column -t", "Mounted filesystems"),
-    ("fdisk -l", "Disk partitions"),
-    ("swapon -s", "Swap spaces in use"),
-    ("hdparm -I /dev/sda", "Disk parameters for /dev/sda"),  # 根据需要调整设备
-    ("dmesg | grep -i 'sda\|hda'", "IDE/SATA device detection at boot"),
-    ("ip a", "Network interfaces"),
-    ("iptables -L", "Firewall settings"),
-    ("route -n", "Routing table"),
-    ("netstat -lntp", "Listening ports"),
-    ("netstat -antp", "Established connections"),
-    ("netstat -s", "Network statistics"),
-    ("cat /var/log/messages | grep -i 'error\|exception'", "System log errors"),  # 根据实际日志路径调整
-    ("systemctl list-units --type=service --state=running", "Running services"),
-    ("systemctl list-units --type=service --state=inactive", "Inactive services"),
-    ("top -b -n 1 | head -n 20", "Top 20 processes by CPU"),
-    ("df -h", "Disk usage"),
-    ("du -sh * | sort -rh | head -n 10", "Top 10 directories by size"),
-    ("iostat -x 1 2", "Disk I/O load"),
-    ("ps aux | wc -l", "Number of processes"),
-    ("sar -n DEV", "Network load"),
-    ("netstat -i || cat /proc/net/dev", "Network errors"),
-    ("who | wc -l || uptime", "Logged in users and system uptime"),
-    ("ps -e -o %cpu,%pid,%mem,args | sort -nr", "Processes by CPU usage"),
-    ("free -h", "Memory space"),
+    "uptime",
+    "df -h",
+    "free -m",
+    "netstat -ant",
+    "tail -n 20 /var/log/syslog",
+    "ps aux --sort=%cpu | head -n 10",
+    "mount | column -t | head -n 10",
+    "ip addr show",
+    "who",
+    "date",
+    "w"
 ]
 
-def execute_commands(server):
+
+def ssh_command(hostname, username, password, command):
+    # 创建SSH客户端
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(server['host'], port=server['port'], username=server['username'], password=server['password'])
+    try:
+        # 连接服务器
+        client.connect(hostname=hostname, username=username, password=password)
+        # 执行命令
+        stdin, stdout, stderr = client.exec_command(command)
+        # 读取命令执行结果
+        output = stdout.read().decode('utf-8')
+        # 关闭连接
+        client.close()
+        return output
+    except Exception as e:
+        print(f"Error executing SSH command on {hostname}: {str(e)}")
+        return None
 
-    # 创建文件名，包含服务器名称和当前日期
-    filename = f"{server['name']}_{datetime.datetime.now().strftime('%Y-%m-%d')}.txt"
 
-    with open(filename, "w") as file:
-        file.write(f"Server: {server['name']}\n")
-        for command, header in commands:
-            file.write(f"\n=== {header} ===\n")
-            stdin, stdout, stderr = client.exec_command(command)
-            output = stdout.read().decode('utf-8')
-            errors = stderr.read().decode('utf-8')
-            
-            if errors:
-                file.write(f"Errors:\n{errors}\n")
-            else:
-                file.write(f"{output}\n")
+def main():
+    today = date.today().strftime("%Y-%m-%d")
+    for server in servers:
+        hostname = server["hostname"]
+        username = server["username"]
+        password = server["password"]
+        output_filename = f"{today}_{hostname}.txt"
+        print(f"Checking server {hostname}...")
+        with open(output_filename, 'w') as f:
+            f.write(f"===== {hostname} =====\n")
+            for command in commands:
+                result = ssh_command(hostname, username, password, command)
+                if result:
+                    f.write(f"=== Command: {command} ===\n")
+                    f.write(result)
+                    f.write("\n\n")
+                else:
+                    f.write(f"=== Command: {command} failed ===\n")
+                    f.write("\n\n")
+        print(f"Output saved to {output_filename}")
 
-    client.close()
-    print(f"Data saved to {filename}")
 
 if __name__ == "__main__":
-    for server in servers:
-        execute_commands(server)
+    main()
